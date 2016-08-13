@@ -36,7 +36,7 @@ ORDER BY log_timestamp DESC
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.log_timestamp.str.decode('utf-8'))
     df[COL_ACT] = 'upload (?)'
-    df[COL_USER] = df.log_user_text
+    df[COL_USER] = df.log_user_text.str.decode('utf-8')
     df.loc[(df.log_action == b'overwrite', COL_ACT)] = 'upload (overwrite)'
     df.loc[(df.log_action == b'upload', COL_ACT)] = 'upload'
     return df
@@ -55,12 +55,13 @@ ORDER BY rev_timestamp DESC
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.rev_timestamp.str.decode('utf-8'))
     df[COL_ACT] = 'edit'
-    df[COL_USER] = df.rev_user_text
+    df[COL_USER] = df.rev_user_text.str.decode('utf-8')
     return df
 
 
 def aggregate(df, sampling):
-    samples = df.groupby(COL_ACT).resample(sampling).apply(len).unstack(COL_ACT, fill_value=0)
+    print(df[COL_ACT].value_counts())
+    samples = df[[COL_ACT]].groupby(COL_ACT).resample(sampling).apply(len).unstack(COL_ACT, fill_value=0)
     samples.columns = samples.columns.droplevel()
     print(samples)
     return samples
@@ -94,9 +95,12 @@ def collect_data(options):
 def generate_test_data(options):
     start = pd.to_datetime(options.start)
     end = pd.to_datetime(options.end)
-    actions = ['test_upload'] * 20 + ['test_edit'] * 15 + ['test_misc']
-    df = pd.DataFrame([[random_date(start, end), actions[randint(0, len(actions)-1)]] for x in range(0, 2000)],
-                      columns=[COL_DATE, COL_ACT]).reindex()
+    actions = ['upload (test)'] * 20 + ['edit (test)'] * 15 + ['misc']
+    users = ['NoName'] * len(actions)
+    df = pd.DataFrame([[random_date(start, end),
+                        actions[randint(0, len(actions)-1)],
+                        users] for x in range(0, 2000)],
+                      columns=[COL_DATE, COL_ACT, COL_USER]).reindex()
     return df
 
 
@@ -115,12 +119,13 @@ if __name__ == '__main__':
     parser.add_argument('--sampling', type=str,
                         default='W')
     parser.add_argument('--end', type=str,
-                        default='9999')
+                        default='2100')
     parser.add_argument('--start', type=str,
-                        default='1111')
+                        default='1900')
     parser.add_argument('--dump', type=str,
                         default='~/public_html/latest.csv.gz')
     parser.add_argument('--output', type=str,
                         default='~/public_html/latest.png')
     options = parser.parse_args()
     main(options)
+
