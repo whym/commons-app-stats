@@ -70,10 +70,10 @@ def aggregate(df, sampling):
 def plot_stacked_bar_chart(samples, file_name):
     fig, ax = plt.subplots(figsize=(10,6))
 
-    samples.plot.bar(stacked=True, ax=ax)
+    samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7))
 
     ax.grid(True)
-    ax.legend(loc=2,fontsize=10,fancybox=True).get_frame().set_alpha(0.5)
+    ax.legend(loc=2,fontsize=10,fancybox=True).get_frame().set_alpha(0.7)
     ax.set_xticklabels(samples.index.date.tolist())
     fig.autofmt_xdate()
     plt.title('Edits and actions made via Commons Android App')
@@ -117,7 +117,7 @@ def main(options):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sampling', type=str,
-                        default='W')
+                        default='Y')
     parser.add_argument('--end', type=str,
                         default='2100')
     parser.add_argument('--start', type=str,
