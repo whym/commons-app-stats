@@ -16,7 +16,7 @@ from random import randint
 
 COL_ACT  = 'action'
 COL_DATE = 'date'
-
+COL_USER = 'user'
 
 def random_date(start, end):
     return start + pd.Timedelta(
@@ -35,9 +35,10 @@ ORDER BY log_timestamp DESC
 
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.log_timestamp.str.decode('utf-8'))
-    df[COL_ACT] = 'misc'
+    df[COL_ACT] = 'upload (?)'
+    df[COL_USER] = df.log_user_text
+    df.loc[(df.log_action == b'overwrite', COL_ACT)] = 'upload (overwrite)'
     df.loc[(df.log_action == b'upload', COL_ACT)] = 'upload'
-
     return df
 
 
@@ -54,7 +55,7 @@ ORDER BY rev_timestamp DESC
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.rev_timestamp.str.decode('utf-8'))
     df[COL_ACT] = 'edit'
-
+    df[COL_USER] = df.rev_user_text
     return df
 
 
@@ -86,7 +87,7 @@ def collect_data(options):
 
     actions = retrieve_logged_actions(conn, options.start, options.end)
     edits   = retrieve_edits(conn, options.start, options.end)
-    df = actions[[COL_DATE, COL_ACT]].append(edits[[COL_DATE, COL_ACT]])
+    df = actions[[COL_DATE, COL_ACT, COL_USER]].append(edits[[COL_DATE, COL_ACT, COL_USER]])
     return df
 
 
@@ -107,7 +108,7 @@ def main(options):
     df = df.set_index(COL_DATE)
     samples = aggregate(df, options.sampling)
     plot_stacked_bar_chart(samples, expanduser(options.output))
-
+    df.to_csv(options.dump, compression='gzip')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -117,6 +118,8 @@ if __name__ == '__main__':
                         default='9999')
     parser.add_argument('--start', type=str,
                         default='1111')
+    parser.add_argument('--dump', type=str,
+                        default='~/public_html/latest.csv.gz')
     parser.add_argument('--output', type=str,
                         default='~/public_html/latest.png')
     options = parser.parse_args()
