@@ -38,7 +38,7 @@ ORDER BY log_timestamp DESC
     df[COL_ACT] = 'upload (?)'
     df[COL_USER] = df.log_user_text.str.decode('utf-8')
     df.loc[(df.log_action == b'overwrite', COL_ACT)] = 'upload (overwrite)'
-    df.loc[(df.log_action == b'upload', COL_ACT)] = 'upload'
+    df.loc[(df.log_action == b'upload', COL_ACT)] = 'upload (new)'
     return df
 
 
