@@ -17,6 +17,7 @@ from random import randint
 COL_ACT  = 'action'
 COL_DATE = 'date'
 COL_USER = 'user'
+COL_TITLE = 'title'
 
 def random_date(start, end):
     return start + pd.Timedelta(
@@ -37,6 +38,7 @@ ORDER BY log_timestamp DESC
     df[COL_DATE] = pd.to_datetime(df.log_timestamp.str.decode('utf-8'))
     df[COL_ACT] = 'upload (?)'
     df[COL_USER] = df.log_user_text.str.decode('utf-8')
+    df[COL_TITLE] = df.log_title.str.decode('utf-8')
     df.loc[(df.log_action == b'overwrite', COL_ACT)] = 'upload (overwrite)'
     df.loc[(df.log_action == b'upload', COL_ACT)] = 'upload (new)'
     return df
@@ -45,7 +47,7 @@ ORDER BY log_timestamp DESC
 def retrieve_edits(conn, start, end):
     command = '''
 SELECT *
-FROM revision
+FROM revision JOIN page ON rev_page = page_id
 WHERE (rev_comment LIKE "%using Android Commons%" OR rev_comment LIKE "%Via Commons Mobile App%")
 AND rev_timestamp > "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
@@ -56,6 +58,7 @@ ORDER BY rev_timestamp DESC
     df[COL_DATE] = pd.to_datetime(df.rev_timestamp.str.decode('utf-8'))
     df[COL_ACT] = 'edit'
     df[COL_USER] = df.rev_user_text.str.decode('utf-8')
+    df[COL_TITLE] = df.page_title.str.decode('utf-8')
     return df
 
 
@@ -67,16 +70,18 @@ def aggregate(df, sampling):
     return samples
 
 
-def plot_stacked_bar_chart(samples, file_name):
+def plot_stacked_bar_chart(samples, file_name, title):
     fig, ax = plt.subplots(figsize=(10,6))
 
+    labels = samples.index.date.tolist()
     samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7))
 
     ax.grid(True)
     ax.legend(loc=2,fontsize=10,fancybox=True).get_frame().set_alpha(0.7)
-    ax.set_xticklabels(samples.index.date.tolist())
+    ax.set_xticklabels(labels)
+    ax.set_xlabel('')
     fig.autofmt_xdate()
-    plt.title('Edits and actions made via Commons Android App')
+    plt.title(title)
     fig.savefig(file_name)
 
 
@@ -88,7 +93,7 @@ def collect_data(options):
 
     actions = retrieve_logged_actions(conn, options.start, options.end)
     edits   = retrieve_edits(conn, options.start, options.end)
-    df = actions[[COL_DATE, COL_ACT, COL_USER]].append(edits[[COL_DATE, COL_ACT, COL_USER]])
+    df = actions[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]].append(edits[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]])
     return df
 
 
@@ -97,10 +102,11 @@ def generate_test_data(options):
     end = pd.to_datetime(options.end)
     actions = ['upload (test)'] * 20 + ['edit (test)'] * 15 + ['misc']
     users = ['NoName'] * len(actions)
+    titles = ['NoTitle'] * len(actions)
     df = pd.DataFrame([[random_date(start, end),
                         actions[randint(0, len(actions)-1)],
-                        users] for x in range(0, 2000)],
-                      columns=[COL_DATE, COL_ACT, COL_USER]).reindex()
+                        users, titles] for x in range(0, 2000)],
+                      columns=[COL_DATE, COL_ACT, COL_USER, COL_TITLE]).reindex()
     return df
 
 
@@ -111,8 +117,12 @@ def main(options):
         df = generate_test_data(options)
     df = df.set_index(COL_DATE)
     samples = aggregate(df, options.sampling)
-    plot_stacked_bar_chart(samples, expanduser(options.output))
+    plot_stacked_bar_chart(
+        samples,
+        expanduser(options.output),
+        'Edits and actions made via Commons Android App (%s)' % options.sampling)
     df.to_csv(options.dump, compression='gzip')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
