@@ -56,14 +56,17 @@ ORDER BY rev_timestamp DESC
 
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.rev_timestamp.str.decode('utf-8'))
-    df[COL_ACT] = 'edit'
+    df[COL_ACT] = 'edit (?)'
     df[COL_USER] = df.rev_user_text.str.decode('utf-8')
     df[COL_TITLE] = df.page_title.str.decode('utf-8')
+    df.loc[(df.rev_parent_id == 0, COL_ACT)] = 'edit (new)'
+    df.loc[(df.rev_parent_id != 0, COL_ACT)] = 'edit (modify)'
     return df
 
 
 def aggregate(df, sampling):
     print(df[COL_ACT].value_counts())
+    df = df[df[COL_ACT] != 'edit (new)'] # skip new page creation - it duplicates new upload
     samples = df[[COL_ACT]].groupby(COL_ACT).resample(sampling).apply(len).unstack(COL_ACT, fill_value=0)
     samples.columns = samples.columns.droplevel()
     print(samples)
