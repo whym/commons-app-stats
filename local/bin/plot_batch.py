@@ -27,7 +27,7 @@ def random_date(start, end):
 def retrieve_logged_actions(conn, start, end):
     command = '''
 SELECT *
-FROM logging
+FROM logging LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
 WHERE (log_comment LIKE "%using Android Commons%" OR log_comment LIKE "%Via Commons Mobile App%")
 AND log_timestamp > "{start}" AND log_timestamp < "{end}"
 ORDER BY log_timestamp DESC
@@ -36,11 +36,12 @@ ORDER BY log_timestamp DESC
 
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.log_timestamp.str.decode('utf-8'))
-    df[COL_ACT] = 'upload (?)'
+    df[COL_ACT] = '?. upload (?)'
     df[COL_USER] = df.log_user_text.str.decode('utf-8')
     df[COL_TITLE] = df.log_title.str.decode('utf-8')
-    df.loc[(df.log_action == b'overwrite', COL_ACT)] = 'upload (overwrite)'
-    df.loc[(df.log_action == b'upload', COL_ACT)] = 'upload (new)'
+    df.loc[(df.log_action == b'overwrite', COL_ACT)] = '2. upload (overwriting)'
+    df.loc[(df.log_action == b'upload', COL_ACT)] = '1. upload (new)'
+    df.loc[(pd.isnull(df.page_id), COL_ACT)] = '3. upload (deleted)'
     return df
 
 
@@ -56,17 +57,17 @@ ORDER BY rev_timestamp DESC
 
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.rev_timestamp.str.decode('utf-8'))
-    df[COL_ACT] = 'edit (?)'
+    df[COL_ACT] = '?. edit (?)'
     df[COL_USER] = df.rev_user_text.str.decode('utf-8')
     df[COL_TITLE] = df.page_title.str.decode('utf-8')
-    df.loc[(df.rev_parent_id == 0, COL_ACT)] = 'edit (new)'
-    df.loc[(df.rev_parent_id != 0, COL_ACT)] = 'edit (modify)'
+    df.loc[(df.rev_parent_id != 0, COL_ACT)] = '5. edit (modifying)'
+    df.loc[(df.rev_parent_id == 0, COL_ACT)] = '4. edit (new)'
     return df
 
 
 def aggregate(df, sampling):
     print(df[COL_ACT].value_counts())
-    df = df[df[COL_ACT] != 'edit (new)'] # skip new page creation - it duplicates new upload
+    df = df[df[COL_ACT] != '4. edit (new)'] # skip new page creation - it duplicates new upload
     samples = df[[COL_ACT]].groupby(COL_ACT).resample(sampling).apply(len).unstack(COL_ACT, fill_value=0)
     samples.columns = samples.columns.droplevel()
     print(samples)
@@ -123,7 +124,7 @@ def main(options):
     plot_stacked_bar_chart(
         samples,
         expanduser(options.output),
-        'Edits and actions made via Commons Android App (%s)' % options.sampling)
+        'Edits and actions made via Commons Android App (per %s)' % options.sampling)
     df.to_csv(options.dump, compression='gzip')
 
 
