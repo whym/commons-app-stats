@@ -2,7 +2,7 @@
 
 Expand this package after logging into tools.wmflabs.org.
 
-Make sure to have a working environment with pandas 0.18+ and python3. Example commands for setting these up:
+Make sure to have a working environment with pandas 0.18+, oursql and python3. Example commands for setting these up:
 
     virtualenv venv --system-site-packages --python /usr/bin/python3
     echo 'source $HOME/venv/bin/activate' >> ~/.bash_profile
@@ -18,10 +18,10 @@ Verify the installations by:
 
 # Run
 
-See ./crontab in the top-level of the repository.
+See ./crontab in the top level of the repository.
 
 # Output
 
 ![Chart](https://tools.wmflabs.org/commons-app-stats/latest.svg)
 
-More at http://tools.wmflabs.org/commons-app-stats/
+More charts are available at http://tools.wmflabs.org/commons-app-stats/.
