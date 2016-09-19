@@ -25,7 +25,10 @@
 #   be modified to be invoked through jsub unless it is one of
 #   the two.
 # 
+SHELL=/bin/bash
+HOME=/data/project/commons-app-stats
+BASH_ENV=${HOME}/.bash_profile
 # m h  dom mon dow   command
-0 9    *   *   *     /usr/bin/jsub -N job_plot1 -mem 2G -once -quiet $HOME/local/bin/plot_batch.py --start 201300 --sampling Q --output $HOME/public_html/latest_quarter.png --dump $HOME/public_html/latest_quarter.csv.gz
-0 0    *   *   *     /usr/bin/jsub -N job_plot2 -mem 2G -once -quiet $HOME/local/bin/plot_batch.py --start 201603 --sampling 7D --output $HOME/public_html/latest.png --dump $HOME/public_html/latest.csv.gz
+0 9    *   *   *     /usr/bin/jsub -N job_plot1 $HOME/local/bin/plot_batch.py --start 201300 --sampling Q --output $HOME/public_html/latest_quarter.png --dump $HOME/public_html/latest_quarter.csv.gz
+0 0    *   *   *     /usr/bin/jsub -N job_plot2 $HOME/local/bin/plot_batch.py --start 201603 --sampling 7D --output $HOME/public_html/latest.png --dump $HOME/public_html/latest.csv.gz
 
