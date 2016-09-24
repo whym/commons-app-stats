@@ -125,7 +125,7 @@ def main(options):
         samples,
         expanduser(options.output),
         'Edits and actions made via Commons Android App (per %s)' % options.sampling)
-    df.to_csv(options.dump, compression='gzip')
+    df.to_csv(options.dump, encoding='utf-8', compression='gzip')
 
 
 if __name__ == '__main__':
