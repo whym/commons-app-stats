@@ -74,10 +74,9 @@ def aggregate(df, sampling):
     return samples
 
 
-def plot_stacked_bar_chart(samples, file_name, title):
+def plot_stacked_bar_chart(labels, samples, file_name, title):
     fig, ax = plt.subplots(figsize=(10,6))
 
-    labels = samples.index.date.tolist()
     samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7))
 
     ax.grid(True)
@@ -121,7 +120,13 @@ def main(options):
         df = generate_test_data(options)
     df = df.set_index(COL_DATE)
     samples = aggregate(df, options.sampling)
+    labels = samples.index.date.tolist()
+    if options.sampling == 'Q':
+        labels = ['%dQ%d' % x for x in zip(samples.index.year.tolist(), samples.index.quarter.tolist())]
+    elif options.sampling == 'W':
+        labels = ['W%d (-%s)' % x for x in zip(samples.index.week.tolist(), samples.index.date.tolist())]
     plot_stacked_bar_chart(
+        labels,
         samples,
         expanduser(options.output),
         'Edits and actions made via Commons Android App (per %s)' % options.sampling)
