@@ -28,7 +28,7 @@ def retrieve_logged_actions(conn, start, end):
     command = '''
 SELECT *
 FROM logging LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
-WHERE (log_comment LIKE "%using Android Commons%" OR log_comment LIKE "%Via Commons Mobile App%")
+WHERE (log_comment LIKE "%using Android Commons%" OR log_comment LIKE "%Via Commons Mobile App%" OR log_comment LIKE "%COM:MOA\\|Commons%")
 AND log_timestamp > "{start}" AND log_timestamp < "{end}"
 ORDER BY log_timestamp DESC
 '''.format(start=start, end=end)
@@ -49,7 +49,7 @@ def retrieve_edits(conn, start, end):
     command = '''
 SELECT *
 FROM revision JOIN page ON rev_page = page_id
-WHERE (rev_comment LIKE "%using Android Commons%" OR rev_comment LIKE "%Via Commons Mobile App%")
+WHERE (rev_comment LIKE "%using Android Commons%" OR rev_comment LIKE "%Via Commons Mobile App%" OR rev_comment LIKE "%COM:MOA\\|Commons%")
 AND rev_timestamp > "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
 '''.format(start=start, end=end)
@@ -89,7 +89,7 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
 
 
 def collect_data(options):
-    conn = oursql.connect(host = 'commonswiki.labsdb',
+    conn = oursql.connect(host = 'commonswiki.analytics.db.svc.eqiad.wmflabs',
                           read_default_file=os.path.expanduser('~/.my.cnf'),
                           db = 'commonswiki_p',
                           use_unicode=False)
