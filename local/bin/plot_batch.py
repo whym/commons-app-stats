@@ -4,7 +4,8 @@
 '''
 import os
 import sys
-import oursql
+from sqlalchemy.engine.url import URL
+from sqlalchemy import create_engine
 import pandas as pd
 import argparse
 import matplotlib.dates as mdates
@@ -89,10 +90,14 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
 
 
 def collect_data(options):
-    conn = oursql.connect(host = 'commonswiki.analytics.db.svc.eqiad.wmflabs',
-                          read_default_file=os.path.expanduser('~/.my.cnf'),
-                          db = 'commonswiki_p',
-                          use_unicode=False)
+    url = URL(
+        drivername='mysql',
+        host='commonswiki.analytics.db.svc.eqiad.wmflabs',
+        database='commonswiki_p',
+        query={ 'read_default_file' : os.path.expanduser('~/.my.cnf'),
+                'use_unicode': 0 }
+    )
+    conn = create_engine(url)
 
     actions = retrieve_logged_actions(conn, options.start, options.end)
     edits   = retrieve_edits(conn, options.start, options.end)
@@ -116,7 +121,7 @@ def generate_test_data(options):
 def main(options):
     try:
         df = collect_data(options)
-    except oursql.InterfaceError:
+    except Exception:
         df = generate_test_data(options)
     df = df.set_index(COL_DATE)
     samples = aggregate(df, options.sampling)
