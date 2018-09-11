@@ -5,7 +5,7 @@
 import os
 import sys
 from sqlalchemy.engine.url import URL
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import pandas as pd
 import argparse
 import matplotlib.dates as mdates
@@ -26,13 +26,13 @@ def random_date(start, end):
 
 
 def retrieve_logged_actions(conn, start, end):
-    command = '''
+    command = text('''
 SELECT *
 FROM logging LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
 WHERE (log_comment LIKE "%using Android Commons%" OR log_comment LIKE "%Via Commons Mobile App%" OR log_comment LIKE "%COM:MOA\\|Commons%")
 AND log_timestamp > "{start}" AND log_timestamp < "{end}"
 ORDER BY log_timestamp DESC
-'''.format(start=start, end=end)
+'''.format(start=start, end=end))
     df = pd.read_sql(command, conn)
 
     # extract data we want to see
@@ -47,13 +47,13 @@ ORDER BY log_timestamp DESC
 
 
 def retrieve_edits(conn, start, end):
-    command = '''
+    command = text('''
 SELECT *
 FROM revision JOIN page ON rev_page = page_id
 WHERE (rev_comment LIKE "%using Android Commons%" OR rev_comment LIKE "%Via Commons Mobile App%" OR rev_comment LIKE "%COM:MOA\\|Commons%")
 AND rev_timestamp > "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
-'''.format(start=start, end=end)
+'''.format(start=start, end=end))
     df = pd.read_sql(command, conn)
 
     # extract data we want to see
@@ -78,9 +78,13 @@ def aggregate(df, sampling):
 def plot_stacked_bar_chart(labels, samples, file_name, title):
     fig, ax = plt.subplots(figsize=(10,6))
 
-    samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7))
-
+    samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7)
     ax.grid(True)
+    ax.set_axisbelow(True)
+    gridlines = ax.get_xgridlines() + ax.get_ygridlines()
+    for line in gridlines:
+        line.set_linestyle('--')
+
     ax.legend(loc=2,fontsize=10,fancybox=True).get_frame().set_alpha(0.7)
     ax.set_xticklabels(labels)
     ax.set_xlabel('')
@@ -91,7 +95,7 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
 
 def collect_data(options):
     url = URL(
-        drivername='mysql',
+        drivername='mysql.mysqldb',
         host='commonswiki.analytics.db.svc.eqiad.wmflabs',
         database='commonswiki_p',
         query={ 'read_default_file' : os.path.expanduser('~/.my.cnf'),
@@ -106,8 +110,6 @@ def collect_data(options):
 
 
 def generate_test_data(options):
-    start = pd.to_datetime(options.start)
-    end = pd.to_datetime(options.end)
     actions = ['upload (test)'] * 20 + ['edit (test)'] * 15 + ['misc']
     users = ['NoName'] * len(actions)
     titles = ['NoTitle'] * len(actions)
@@ -119,9 +121,14 @@ def generate_test_data(options):
 
 
 def main(options):
+    def format_ts(d):
+        return '{:04d}{:02d}'.format(d.year, d.month)
     try:
+        options.start = format_ts(options.start)
+        options.starend = format_ts(options.end)
         df = collect_data(options)
-    except Exception:
+    except Exception as e:
+        sys.stderr.write("Exception: {}\n".format(e))
         df = generate_test_data(options)
     df = df.set_index(COL_DATE)
     samples = aggregate(df, options.sampling)
@@ -142,9 +149,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--sampling', type=str,
                         default='Y')
-    parser.add_argument('--end', type=str,
+    parser.add_argument('--end', type=pd.to_datetime,
                         default='2100')
-    parser.add_argument('--start', type=str,
+    parser.add_argument('--start', type=pd.to_datetime,
                         default='1900')
     parser.add_argument('--dump', type=str,
                         default='~/public_html/latest.csv.gz')
