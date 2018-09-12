@@ -27,7 +27,7 @@ def random_date(start, end):
 
 def retrieve_logged_actions(conn, start, end):
     command = text('''
-SELECT *
+SELECT /* SLOW_OK */ *
 FROM logging LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
 WHERE (log_comment LIKE "%using Android Commons%" OR log_comment LIKE "%Via Commons Mobile App%" OR log_comment LIKE "%COM:MOA\\|Commons%")
 AND log_timestamp > "{start}" AND log_timestamp < "{end}"
@@ -48,7 +48,7 @@ ORDER BY log_timestamp DESC
 
 def retrieve_edits(conn, start, end):
     command = text('''
-SELECT *
+SELECT /* SLOW_OK */ *
 FROM revision JOIN page ON rev_page = page_id
 WHERE (rev_comment LIKE "%using Android Commons%" OR rev_comment LIKE "%Via Commons Mobile App%" OR rev_comment LIKE "%COM:MOA\\|Commons%")
 AND rev_timestamp > "{start}" AND rev_timestamp < "{end}"
@@ -79,13 +79,14 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
     fig, ax = plt.subplots(figsize=(10,6))
 
     samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7)
+    #samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7, color=['blue', 'green', 'red', 'black'])
     ax.grid(True)
     ax.set_axisbelow(True)
     gridlines = ax.get_xgridlines() + ax.get_ygridlines()
     for line in gridlines:
         line.set_linestyle('--')
 
-    ax.legend(loc=2,fontsize=10,fancybox=True).get_frame().set_alpha(0.7)
+    ax.legend(loc=2, fontsize=10, fancybox=True).get_frame().set_alpha(0.7)
     ax.set_xticklabels(labels)
     ax.set_xlabel('')
     fig.autofmt_xdate()
@@ -95,7 +96,7 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
 
 def collect_data(options):
     url = URL(
-        drivername='mysql.mysqldb',
+        drivername='mysql.pymysql',
         host='commonswiki.analytics.db.svc.eqiad.wmflabs',
         database='commonswiki_p',
         query={ 'read_default_file' : os.path.expanduser('~/.my.cnf'),
@@ -122,7 +123,7 @@ def generate_test_data(options):
 
 def main(options):
     def format_ts(d):
-        return '{:04d}{:02d}'.format(d.year, d.month)
+        return '{:04d}{:02d}{:02d}'.format(d.year, d.month, d.day)
     try:
         options.start = format_ts(options.start)
         options.starend = format_ts(options.end)
