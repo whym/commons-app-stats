@@ -19,7 +19,17 @@ COL_ACT  = 'action'
 COL_DATE = 'date'
 COL_USER = 'user'
 COL_TITLE = 'title'
-
+LEGENDS = {
+    '1. upload (new)': 'blue',
+    '2. upload (overwriting)': 'orange',
+    '3. upload (deleted)': 'red',
+    '4. edit': 'green',
+    '5. edit (new)': 'black',
+    '?. upload (?)': 'yellow',
+    'edit (dummy)': 'green',
+    'upload (dummy)': 'black',
+    'misc': 'red',
+}
 
 def retrieve_logged_actions(conn, start, end):
     command = text('''
@@ -57,27 +67,26 @@ ORDER BY rev_timestamp DESC
     df[COL_ACT] = '?. edit (?)'
     df[COL_USER] = df.rev_user_text.str.decode('utf-8')
     df[COL_TITLE] = df.page_title.str.decode('utf-8')
-    df.loc[(df.rev_parent_id != 0, COL_ACT)] = '5. edit (modifying)'
-    df.loc[(df.rev_parent_id == 0, COL_ACT)] = '4. edit (new)'
+    df.loc[(df.rev_parent_id != 0, COL_ACT)] = '4. edit'
+    df.loc[(df.rev_parent_id == 0, COL_ACT)] = '5. edit (new)'
     return df
 
 
 def aggregate(df, sampling):
     print(df[COL_ACT].value_counts())
     # skip new page creation - it duplicates new upload
-    df = df[df[COL_ACT] != '4. edit (new)']
+    df = df[df[COL_ACT] != '5. edit (new)']
 
     samples = df[[COL_ACT]].groupby(COL_ACT).resample(sampling).apply(len).unstack(COL_ACT, fill_value=0)
-    #samples.columns = samples.columns.droplevel()
+    samples.columns = samples.columns.droplevel()
     print(samples)
     return samples
 
 
 def plot_stacked_bar_chart(labels, samples, file_name, title):
     fig, ax = plt.subplots(figsize=(10,6))
-
-    samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7)
-    #samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7, color=['blue', 'green', 'red', 'black'])
+    colors = [LEGENDS[x] for x in samples.columns]
+    samples.plot.bar(stacked=True, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7, color=colors)
     ax.grid(True)
     ax.set_axisbelow(True)
     gridlines = ax.get_xgridlines() + ax.get_ygridlines()
