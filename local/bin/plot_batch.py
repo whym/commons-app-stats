@@ -20,10 +20,6 @@ COL_DATE = 'date'
 COL_USER = 'user'
 COL_TITLE = 'title'
 
-def random_date(start, end):
-    return start + pd.Timedelta(
-        seconds=randint(0, int((end - start).total_seconds())))
-
 
 def retrieve_logged_actions(conn, start, end):
     command = text('''
@@ -68,9 +64,11 @@ ORDER BY rev_timestamp DESC
 
 def aggregate(df, sampling):
     print(df[COL_ACT].value_counts())
-    df = df[df[COL_ACT] != '4. edit (new)'] # skip new page creation - it duplicates new upload
+    # skip new page creation - it duplicates new upload
+    df = df[df[COL_ACT] != '4. edit (new)']
+
     samples = df[[COL_ACT]].groupby(COL_ACT).resample(sampling).apply(len).unstack(COL_ACT, fill_value=0)
-    samples.columns = samples.columns.droplevel()
+    #samples.columns = samples.columns.droplevel()
     print(samples)
     return samples
 
@@ -96,7 +94,7 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
 
 def collect_data(options):
     url = URL(
-        drivername='mysql.pymysql',
+        drivername='mysql.mysqldb',
         host='commonswiki.analytics.db.svc.eqiad.wmflabs',
         database='commonswiki_p',
         query={ 'read_default_file' : os.path.expanduser('~/.my.cnf'),
@@ -104,17 +102,28 @@ def collect_data(options):
     )
     conn = create_engine(url)
 
-    actions = retrieve_logged_actions(conn, options.start, options.end)
-    edits   = retrieve_edits(conn, options.start, options.end)
+    start = format_ts(options.start)
+    end = format_ts(options.end)
+    actions = retrieve_logged_actions(conn, start, end)
+    edits   = retrieve_edits(conn, start, end)
     df = actions[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]].append(edits[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]])
     return df
 
 
-def generate_test_data(options):
-    actions = ['upload (test)'] * 20 + ['edit (test)'] * 15 + ['misc']
+def format_ts(d):
+    return '{:04d}{:02d}{:02d}'.format(d.year, d.month, d.day)
+
+
+def random_date(start, end):
+    return start + pd.Timedelta(
+        seconds=randint(0, int((end - start).total_seconds())))
+
+
+def generate_dummy_data(options):
+    actions = ['upload (dummy)'] * 20 + ['edit (dummy)'] * 15 + ['misc']
     users = ['NoName'] * len(actions)
     titles = ['NoTitle'] * len(actions)
-    df = pd.DataFrame([[random_date(start, end),
+    df = pd.DataFrame([[random_date(options.start, options.end),
                         actions[randint(0, len(actions)-1)],
                         users, titles] for x in range(0, 2000)],
                       columns=[COL_DATE, COL_ACT, COL_USER, COL_TITLE]).reindex()
@@ -122,15 +131,11 @@ def generate_test_data(options):
 
 
 def main(options):
-    def format_ts(d):
-        return '{:04d}{:02d}{:02d}'.format(d.year, d.month, d.day)
     try:
-        options.start = format_ts(options.start)
-        options.starend = format_ts(options.end)
         df = collect_data(options)
     except Exception as e:
         sys.stderr.write("Exception: {}\n".format(e))
-        df = generate_test_data(options)
+        df = generate_dummy_data(options)
     df = df.set_index(COL_DATE)
     samples = aggregate(df, options.sampling)
     labels = samples.index.date.tolist()
