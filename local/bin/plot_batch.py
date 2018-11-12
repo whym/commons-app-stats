@@ -28,14 +28,14 @@ LEGENDS = {
     '?. upload (?)': 'yellow',
     'edit (dummy)': 'green',
     'upload (dummy)': 'black',
-    'misc': 'red',
+    'misc': 'grey',
 }
 
 def retrieve_logged_actions(conn, start, end):
     command = text('''
 SELECT /* SLOW_OK */ *
-FROM logging LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
-WHERE (log_comment LIKE "%using Android Commons%" OR log_comment LIKE "%Via Commons Mobile App%" OR log_comment LIKE "%COM:MOA\\|Commons%")
+FROM logging JOIN comment ON log_comment_id = comment_id LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
+WHERE (comment_text LIKE "%using Android Commons%" OR comment_text LIKE "%Via Commons Mobile App%" OR comment_text LIKE "%COM:MOA\\|Commons%")
 AND log_timestamp > "{start}" AND log_timestamp < "{end}"
 ORDER BY log_timestamp DESC
 '''.format(start=start, end=end))
@@ -55,8 +55,8 @@ ORDER BY log_timestamp DESC
 def retrieve_edits(conn, start, end):
     command = text('''
 SELECT /* SLOW_OK */ *
-FROM revision JOIN page ON rev_page = page_id
-WHERE (rev_comment LIKE "%using Android Commons%" OR rev_comment LIKE "%Via Commons Mobile App%" OR rev_comment LIKE "%COM:MOA\\|Commons%")
+FROM revision JOIN comment ON rev_comment_id = comment_id JOIN page ON rev_page = page_id
+WHERE (comment_text LIKE "%using Android Commons%" OR comment_text LIKE "%Via Commons Mobile App%" OR comment_text LIKE "%COM:MOA\\|Commons%")
 AND rev_timestamp > "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
 '''.format(start=start, end=end))
