@@ -31,20 +31,33 @@ LEGENDS = {
     'misc': 'grey',
 }
 
+def split_date_span(start, end, length):
+    x = start
+    ret = []
+    while x < end:
+        ret.append((x, min(x + length, end)))
+        x += length
+    return ret
+
 def retrieve_logged_actions(conn, start, end):
     command = text('''
-SELECT /* SLOW_OK */ *
-FROM logging JOIN comment ON log_comment_id = comment_id LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
-WHERE (comment_text LIKE "%using Android Commons%" OR comment_text LIKE "%Via Commons Mobile App%" OR comment_text LIKE "%COM:MOA\\|Commons%")
-AND log_timestamp > "{start}" AND log_timestamp < "{end}"
-ORDER BY log_timestamp DESC
+ SELECT /* SLOW_OK */ log_id, log_timestamp, actor_name, log_title, log_action, page_id
+ FROM logging
+    JOIN comment ON log_comment_id = comment_id
+    JOIN actor ON log_actor = actor_id
+    LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
+ WHERE (log_action = 'overwrite' OR log_action = 'upload')
+ AND (EXISTS (SELECT * FROM change_tag WHERE ct_log_id = log_id AND ct_tag_id = 22) /* ="Android app edit" */
+    OR comment_text LIKE "%COM:MOA%")
+ AND log_timestamp >= "{start}" AND log_timestamp < "{end}"
+ ORDER BY log_timestamp DESC
 '''.format(start=start, end=end))
     df = pd.read_sql(command, conn)
 
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.log_timestamp.str.decode('utf-8'))
     df[COL_ACT] = '?. upload (?)'
-    df[COL_USER] = df.log_user_text.str.decode('utf-8')
+    df[COL_USER] = df.actor_name.str.decode('utf-8')
     df[COL_TITLE] = df.log_title.str.decode('utf-8')
     df.loc[(df.log_action == b'overwrite', COL_ACT)] = '2. upload (overwriting)'
     df.loc[(df.log_action == b'upload', COL_ACT)] = '1. upload (new)'
@@ -54,10 +67,14 @@ ORDER BY log_timestamp DESC
 
 def retrieve_edits(conn, start, end):
     command = text('''
-SELECT /* SLOW_OK */ *
-FROM revision JOIN comment ON rev_comment_id = comment_id JOIN page ON rev_page = page_id
-WHERE (comment_text LIKE "%using Android Commons%" OR comment_text LIKE "%Via Commons Mobile App%" OR comment_text LIKE "%COM:MOA\\|Commons%")
-AND rev_timestamp > "{start}" AND rev_timestamp < "{end}"
+SELECT /* SLOW_OK */ rev_timestamp, actor_name, page_title, rev_parent_id
+FROM revision
+   JOIN comment ON rev_comment_id = comment_id
+   JOIN actor ON rev_actor = actor_id
+   JOIN page ON rev_page = page_id
+ WHERE (EXISTS (SELECT * FROM change_tag WHERE ct_rev_id = rev_id AND ct_tag_id = 22) /* ="Android app edit" */
+   OR comment_text LIKE "%COM:MOA%")
+ AND rev_timestamp >= "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
 '''.format(start=start, end=end))
     df = pd.read_sql(command, conn)
@@ -65,7 +82,7 @@ ORDER BY rev_timestamp DESC
     # extract data we want to see
     df[COL_DATE] = pd.to_datetime(df.rev_timestamp.str.decode('utf-8'))
     df[COL_ACT] = '?. edit (?)'
-    df[COL_USER] = df.rev_user_text.str.decode('utf-8')
+    df[COL_USER] = df.actor_name.str.decode('utf-8')
     df[COL_TITLE] = df.page_title.str.decode('utf-8')
     df.loc[(df.rev_parent_id != 0, COL_ACT)] = '4. edit'
     df.loc[(df.rev_parent_id == 0, COL_ACT)] = '5. edit (new)'
@@ -111,10 +128,15 @@ def collect_data(options):
     )
     conn = create_engine(url)
 
-    start = format_ts(options.start)
-    end = format_ts(options.end)
-    actions = retrieve_logged_actions(conn, start, end)
-    edits   = retrieve_edits(conn, start, end)
+    actions = []
+    edits = []
+    for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('90 days')):
+        s = format_ts(s)
+        e = format_ts(e)
+        actions.append(retrieve_logged_actions(conn, s, e))
+        edits.append(retrieve_edits(conn, s, e))
+    actions = pd.concat(actions)
+    edits = pd.concat(edits)
     df = actions[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]].append(edits[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]])
     return df
 
@@ -132,7 +154,7 @@ def generate_dummy_data(options):
     actions = ['upload (dummy)'] * 20 + ['edit (dummy)'] * 15 + ['misc']
     users = ['NoName'] * len(actions)
     titles = ['NoTitle'] * len(actions)
-    df = pd.DataFrame([[random_date(options.start, options.end),
+    df = pd.DataFrame([[random_date(options.start, min(options.start + pd.Timedelta(days=200), options.end)),
                         actions[randint(0, len(actions)-1)],
                         users, titles] for x in range(0, 2000)],
                       columns=[COL_DATE, COL_ACT, COL_USER, COL_TITLE]).reindex()

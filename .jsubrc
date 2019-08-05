@@ -1,4 +1,3 @@
 -mem 2G
--l release=trusty
 -once
 -quiet
