@@ -48,6 +48,8 @@ def retrieve_logged_actions(conn, start, end):
     LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
  WHERE (log_action = 'overwrite' OR log_action = 'upload')
  AND (EXISTS (SELECT * FROM change_tag WHERE ct_log_id = log_id AND ct_tag_id = 22) /* ="Android app edit" */
+    OR comment_text LIKE "%Via Commons Mobile App%"
+    OR comment_text LIKE "%using Android Commons%"
     OR comment_text LIKE "%COM:MOA%")
  AND log_timestamp >= "{start}" AND log_timestamp < "{end}"
  ORDER BY log_timestamp DESC
@@ -73,7 +75,9 @@ FROM revision
    JOIN actor ON rev_actor = actor_id
    JOIN page ON rev_page = page_id
  WHERE (EXISTS (SELECT * FROM change_tag WHERE ct_rev_id = rev_id AND ct_tag_id = 22) /* ="Android app edit" */
-   OR comment_text LIKE "%COM:MOA%")
+    OR comment_text LIKE "%Via Commons Mobile App%"
+    OR comment_text LIKE "%using Android Commons%"
+    OR comment_text LIKE "%COM:MOA%")
  AND rev_timestamp >= "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
 '''.format(start=start, end=end))
@@ -126,15 +130,15 @@ def collect_data(options):
         query={ 'read_default_file' : os.path.expanduser('~/.my.cnf'),
                 'use_unicode': 0 }
     )
-    conn = create_engine(url)
+    engine = create_engine(url, echo=True)
 
     actions = []
     edits = []
-    for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('90 days')):
+    for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('100 days')):
         s = format_ts(s)
         e = format_ts(e)
-        actions.append(retrieve_logged_actions(conn, s, e))
-        edits.append(retrieve_edits(conn, s, e))
+        actions.append(retrieve_logged_actions(engine.connect(), s, e))
+        edits.append(retrieve_edits(engine.connect(), s, e))
     actions = pd.concat(actions)
     edits = pd.concat(edits)
     df = actions[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]].append(edits[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]])
@@ -187,7 +191,7 @@ if __name__ == '__main__':
     parser.add_argument('--sampling', type=str,
                         default='Y')
     parser.add_argument('--end', type=pd.to_datetime,
-                        default='2100')
+                        default=pd.datetime.today())
     parser.add_argument('--start', type=pd.to_datetime,
                         default='1900')
     parser.add_argument('--dump', type=str,
