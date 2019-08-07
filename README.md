@@ -1,5 +1,7 @@
 This is the source code of a web service hosted by tools.wmflabs.org. It shows charts indicating the number of files upload using the Android app for Wikimedia Commons. It is entirely written in Python.
 
+All the data is extracted from the central database of Wikimedia Commons *using an access that allows retrieving publicly accessible data only.* In other words, this just gives a graphical summary of publicly accessible data such as the chronological list of all mobile uploads -- if a photo has not been uploaded, that won't be counted here either.
+
 # Setup
 
 Expand this package after logging into tools.wmflabs.org.
