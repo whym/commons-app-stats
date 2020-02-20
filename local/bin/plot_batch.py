@@ -140,7 +140,7 @@ def collect_data(options):
 
     actions = []
     edits = []
-    for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('100 days')):
+    for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('20 days')):
         s = format_ts(s)
         e = format_ts(e)
         actions.append(retrieve_logged_actions(engine.connect(), s, e))

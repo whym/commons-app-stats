@@ -29,6 +29,6 @@ SHELL=/bin/bash
 HOME=/data/project/commons-app-stats
 BASH_ENV=${HOME}/.bash_profile
 # m h  dom mon dow   command
-0 9    *   *   Sat   /usr/bin/jsub -N job_plot1 $HOME/local/bin/plot_batch.py --start 2015-01 --sampling Q --output $HOME/public_html/latest_quarter.svg --dump $HOME/public_html/latest_quarter.csv.gz
-0 0    *   *   *     /usr/bin/jsub -N job_plot2 $HOME/local/bin/plot_batch.py --start=-70days --sampling W --output $HOME/public_html/latest.svg --dump $HOME/public_html/latest.csv.gz
+0 9    *   *   Sat   /usr/bin/jsub -mem 2g -N job_plot1 $HOME/local/bin/plot_batch.py --start 2015-01 --sampling Q --output $HOME/public_html/latest_quarter.svg --dump $HOME/public_html/latest_quarter.csv.gz
+0 0    *   *   *     /usr/bin/jsub -mem 2g -N job_plot2 $HOME/local/bin/plot_batch.py --start=-70days --sampling W --output $HOME/public_html/latest.svg --dump $HOME/public_html/latest.csv.gz
 
