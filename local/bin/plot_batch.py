@@ -42,18 +42,18 @@ def split_date_span(start, end, length):
 
 def retrieve_logged_actions(conn, start, end):
     command = text('''
- SELECT /* SLOW_OK */ log_id, log_timestamp, actor_name, log_title, log_action, page_id
- FROM logging
-    JOIN comment ON log_comment_id = comment_id
-    JOIN actor ON log_actor = actor_id
-    LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
- WHERE (log_action = 'overwrite' OR log_action = 'upload')
- AND (EXISTS (SELECT * FROM change_tag WHERE ct_log_id = log_id AND ct_tag_id = 22) /* ="Android app edit" */
+SELECT /* SLOW_OK */ log_id, log_timestamp, actor_name, log_title, log_action, page_id
+FROM logging
+  JOIN comment_logging ON log_comment_id = comment_id
+  JOIN actor_logging ON log_actor = actor_id
+  LEFT JOIN page ON log_namespace = page_namespace AND log_title = page_title
+WHERE (log_action = 'overwrite' OR log_action = 'upload')
+  AND (EXISTS (SELECT * FROM change_tag WHERE ct_log_id = log_id AND ct_tag_id = @app_tag_id)
     OR comment_text LIKE "%Via Commons Mobile App%"
     OR comment_text LIKE "%using Android Commons%"
     OR comment_text LIKE "%COM:MOA%")
- AND log_timestamp >= "{start}" AND log_timestamp < "{end}"
- ORDER BY log_timestamp DESC
+  AND log_timestamp >= "{start}" AND log_timestamp < "{end}"
+ORDER BY log_timestamp DESC
 '''.format(start=start, end=end))
     df = pd.read_sql(command, conn)
 
@@ -72,14 +72,17 @@ def retrieve_edits(conn, start, end):
     command = text('''
 SELECT /* SLOW_OK */ rev_timestamp, actor_name, page_title, rev_parent_id
 FROM revision
-   JOIN comment ON rev_comment_id = comment_id
-   JOIN actor ON rev_actor = actor_id
-   JOIN page ON rev_page = page_id
- WHERE (EXISTS (SELECT * FROM change_tag WHERE ct_rev_id = rev_id AND ct_tag_id = 22) /* ="Android app edit" */
+  JOIN comment_revision ON rev_comment_id = comment_id
+  JOIN actor_revision ON rev_actor = actor_id
+  JOIN page ON rev_page = page_id
+WHERE NOT comment_text LIKE "Bot: %" /* EXISTS(SELECT * FROM user LEFT JOIN user_groups ON user_id = ug_user WHERE actor_user = user_id AND ug_group = "bot") */
+  AND NOT EXISTS(SELECT * FROM change_tag WHERE ct_rev_id = rev_id AND ct_tag_id = @uw_tag_id)
+  AND ((EXISTS (SELECT ct_tag_id FROM change_tag WHERE ct_rev_id = rev_id AND ct_tag_id = @app_tag_id)
+        AND NOT EXISTS(SELECT ct_tag_id FROM change_tag WHERE ct_rev_id = rev_id AND ct_tag_id = @se_tag_id ))
     OR comment_text LIKE "%Via Commons Mobile App%"
     OR comment_text LIKE "%using Android Commons%"
     OR comment_text LIKE "%COM:MOA%")
- AND rev_timestamp >= "{start}" AND rev_timestamp < "{end}"
+  AND rev_timestamp >= "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
 '''.format(start=start, end=end))
     df = pd.read_sql(command, conn)
@@ -140,11 +143,29 @@ def collect_data(options):
 
     actions = []
     edits = []
+    conn = engine.connect()
+    conn.execute('''
+SET @app_tag_id = (
+  SELECT ctd_id
+  FROM change_tag_def
+  WHERE ctd_name = "android app edit"
+);
+SET @se_tag_id = (
+  SELECT ctd_id
+  FROM change_tag_def
+  WHERE ctd_name = "apps-suggested-edits"
+);
+SET @uw_tag_id = (
+  SELECT ctd_id
+  FROM change_tag_def
+  WHERE ctd_name = "uploadwizard"
+);
+''')
     for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('20 days')):
         s = format_ts(s)
         e = format_ts(e)
-        actions.append(retrieve_logged_actions(engine.connect(), s, e))
-        edits.append(retrieve_edits(engine.connect(), s, e))
+        actions.append(retrieve_logged_actions(conn, s, e))
+        edits.append(retrieve_edits(conn, s, e))
     actions = pd.concat(actions)
     edits = pd.concat(edits)
     df = actions[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]].append(edits[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]])
