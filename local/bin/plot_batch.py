@@ -9,9 +9,7 @@ from sqlalchemy import create_engine, text
 import pandas as pd
 import numpy as np
 import argparse
-import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
-from datetime import datetime
 from os.path import expanduser
 from random import randint
 
@@ -32,6 +30,7 @@ LEGENDS = {
     'misc': 'grey',
 }
 
+
 def split_date_span(start, end, length):
     x = start
     ret = []
@@ -39,6 +38,7 @@ def split_date_span(start, end, length):
         ret.append((x, min(x + length, end)))
         x += length
     return ret
+
 
 def retrieve_logged_actions(conn, start, end):
     command = text('''
@@ -109,13 +109,14 @@ def aggregate(df, sampling):
 
 
 def plot_stacked_bar_chart(labels, samples, file_name, title):
-    fig, ax = plt.subplots(figsize=(10,6))
+    fig, ax = plt.subplots(figsize=(10, 6))
     xs = np.arange(len(samples.index))
     width = .35
     for (i, columns) in enumerate([list(filter(lambda x: x.find('upload') >= 0, samples.columns)),
                                    list(filter(lambda x: x.find('edit') >= 0, samples.columns))]):
         colors = [LEGENDS[x] for x in columns]
-        samples[columns].plot.bar(stacked=True, position=i, width=width, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7, color=colors)
+        if not samples[columns].empty:
+            samples[columns].plot.bar(stacked=True, position=i, width=width, ax=ax, ec=(0.1, 0.1, 0.1, 0.7), alpha=0.7, color=colors)
     ax.grid(True)
     ax.set_axisbelow(True)
     gridlines = ax.get_xgridlines() + ax.get_ygridlines()
@@ -125,7 +126,7 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
     ax.legend(loc=2, fontsize=10, fancybox=True).get_frame().set_alpha(0.7)
     ax.set_xticklabels(labels)
     ax.set_xlabel('')
-    ax.set_xticks(np.append(ax.get_xticks(), [len(ax.get_xticks())])) # add space to the right
+    ax.set_xticks(np.append(ax.get_xticks(), [len(ax.get_xticks())]))  # add space to the right
     fig.autofmt_xdate()
     plt.title(title)
     fig.savefig(file_name, bbox_inches='tight')
@@ -136,8 +137,10 @@ def collect_data(options):
         drivername='mysql.mysqldb',
         host='commonswiki.analytics.db.svc.eqiad.wmflabs',
         database='commonswiki_p',
-        query={ 'read_default_file' : os.path.expanduser('~/.my.cnf'),
-                'use_unicode': 0 }
+        query={
+            'read_default_file': os.path.expanduser('~/.my.cnf'),
+            'use_unicode': 0
+        }
     )
     engine = create_engine(url, echo=True)
 
@@ -164,8 +167,10 @@ SET @uw_tag_id = (
     for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('20 days')):
         s = format_ts(s)
         e = format_ts(e)
-        actions.append(retrieve_logged_actions(conn, s, e))
-        edits.append(retrieve_edits(conn, s, e))
+        if options.target == 'all' or options.target == 'uploads':
+            actions.append(retrieve_logged_actions(conn, s, e))
+        if options.target == 'all' or options.target == 'edits':
+            edits.append(retrieve_edits(conn, s, e))
     actions = pd.concat(actions)
     edits = pd.concat(edits)
     df = actions[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]].append(edits[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]])
@@ -182,7 +187,11 @@ def random_date(start, end):
 
 
 def generate_dummy_data(options):
-    actions = ['upload (dummy)'] * 20 + ['edit (dummy)'] * 15 + ['misc']
+    actions = ['misc']
+    if options.target == 'all' or options.target == 'uploads':
+        actions += ['upload (dummy)'] * 20
+    if options.target == 'all' or options.target == 'edits':
+        actions += ['edit (dummy)'] * 15
     users = ['NoName'] * len(actions)
     titles = ['NoTitle'] * len(actions)
     df = pd.DataFrame([[random_date(options.start, min(options.start + pd.Timedelta(days=200), options.end)),
@@ -196,7 +205,7 @@ def to_datetime(ts):
     ret = None
     try:
         ret = pd.to_datetime(ts)
-    except ValueError as e:
+    except ValueError:
         ret = pd.datetime.today() + pd.to_timedelta(ts)
     return ret
 
@@ -218,7 +227,9 @@ def main(options):
         labels,
         samples,
         expanduser(options.output),
-        'Edits and actions made via Commons Android App (per %s)' % options.sampling)
+        '%s made via Commons Android App (per %s)' % (
+            {'all': 'Edits and uploads', 'edits': 'Edits', 'uploads': 'Uploads'}[options.target],
+            options.sampling))
     df.to_csv(options.dump, encoding='utf-8', compression='gzip')
 
 
@@ -230,10 +241,11 @@ if __name__ == '__main__':
                         default=pd.datetime.today())
     parser.add_argument('--start', type=to_datetime,
                         default='1900')
+    parser.add_argument('--target', choices=['edits', 'uploads', 'all'],
+                        default='all')
     parser.add_argument('--dump', type=str,
                         default='~/public_html/latest.csv.gz')
     parser.add_argument('--output', type=str,
                         default='~/public_html/latest.png')
     options = parser.parse_args()
     main(options)
-
