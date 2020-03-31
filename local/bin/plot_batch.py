@@ -9,6 +9,7 @@ from sqlalchemy import create_engine, text
 import pandas as pd
 import numpy as np
 import argparse
+import traceback
 import matplotlib.pyplot as plt
 from os.path import expanduser
 from random import randint
@@ -66,7 +67,7 @@ ORDER BY log_timestamp DESC
     df.loc[(df.log_action == b'overwrite', COL_ACT)] = '2. upload (overwriting)'
     df.loc[(df.log_action == b'upload', COL_ACT)] = '1. upload (new)'
     df.loc[(pd.isnull(df.page_id), COL_ACT)] = '3. upload (deleted)'
-    return df
+    return df[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]]
 
 
 def retrieve_edits(conn, start, end):
@@ -96,7 +97,7 @@ ORDER BY rev_timestamp DESC
     df[COL_TITLE] = df.page_title.str.decode('utf-8')
     df.loc[(df.rev_parent_id != 0, COL_ACT)] = '4. edit'
     df.loc[(df.rev_parent_id == 0, COL_ACT)] = '5. edit (new)'
-    return df
+    return df[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]]
 
 
 def aggregate(df, sampling):
@@ -147,7 +148,6 @@ def collect_data(options):
     engine = create_engine(url, echo=True)
 
     actions = []
-    edits = []
     conn = engine.connect()
     conn.execute('''
 SET @app_tag_id = (
@@ -166,16 +166,14 @@ SET @uw_tag_id = (
   WHERE ctd_name = "uploadwizard"
 );
 ''')
-    for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('20 days')):
+    for (s, e) in split_date_span(options.start, options.end, pd.Timedelta('40 days')):
         s = format_ts(s)
         e = format_ts(e)
         if options.target == 'all' or options.target == 'uploads':
             actions.append(retrieve_logged_actions(conn, s, e))
         if options.target == 'all' or options.target == 'edits':
-            edits.append(retrieve_edits(conn, s, e))
-    actions = pd.concat(actions)
-    edits = pd.concat(edits)
-    df = actions[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]].append(edits[[COL_DATE, COL_ACT, COL_USER, COL_TITLE]])
+            actions.append(retrieve_edits(conn, s, e))
+    df = pd.concat(actions)
     return df
 
 
@@ -215,8 +213,8 @@ def to_datetime(ts):
 def main(options):
     try:
         df = collect_data(options)
-    except Exception as e:
-        sys.stderr.write("Exception: {}\n".format(e))
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
         df = generate_dummy_data(options)
     df = df.set_index(COL_DATE)
     samples = aggregate(df, options.sampling)
