@@ -12,6 +12,7 @@ import argparse
 import matplotlib.pyplot as plt
 from os.path import expanduser
 from random import randint
+from datetime import datetime
 
 
 COL_ACT  = 'action'
@@ -82,6 +83,7 @@ WHERE NOT comment_text LIKE "Bot: %" /* EXISTS(SELECT * FROM user LEFT JOIN user
     OR comment_text LIKE "%Via Commons Mobile App%"
     OR comment_text LIKE "%using Android Commons%"
     OR comment_text LIKE "%COM:MOA%")
+  AND comment_text NOT LIKE "%#suggestededit-add%"
   AND rev_timestamp >= "{start}" AND rev_timestamp < "{end}"
 ORDER BY rev_timestamp DESC
 '''.format(start=start, end=end))
@@ -238,7 +240,7 @@ if __name__ == '__main__':
     parser.add_argument('--sampling', type=str,
                         default='Y')
     parser.add_argument('--end', type=to_datetime,
-                        default=pd.datetime.today())
+                        default=datetime.today())
     parser.add_argument('--start', type=to_datetime,
                         default='1900')
     parser.add_argument('--target', choices=['edits', 'uploads', 'all'],
