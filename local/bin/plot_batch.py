@@ -138,7 +138,7 @@ def plot_stacked_bar_chart(labels, samples, file_name, title):
 def collect_data(options):
     url = URL(
         drivername='mysql.mysqldb',
-        host='commonswiki.analytics.db.svc.eqiad.wmflabs',
+        host='commonswiki.analytics.db.svc.wikimedia.cloud',
         database='commonswiki_p',
         query={
             'read_default_file': os.path.expanduser('~/.my.cnf'),
@@ -206,7 +206,7 @@ def to_datetime(ts):
     try:
         ret = pd.to_datetime(ts)
     except ValueError:
-        ret = pd.datetime.today() + pd.to_timedelta(ts)
+        ret = datetime.today() + pd.to_timedelta(ts)
     return ret
 
 
