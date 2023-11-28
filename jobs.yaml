@@ -1,0 +1,15 @@
+- name: job-plot1
+  image: python3.7
+  mem: 2Gi
+  cpu: 1
+  command: "venv/bin/python local/bin/plot_batch.py --start 2015-01 --sampling Q --output $HOME/public_html/latest_quarter.svg --dump $HOME/public_html/latest_quarter.csv.gz --target=uploads"
+  filelog-stdout: public_html/logs/job-plot1.txt
+  filelog-stderr: public_html/logs/job-plot1.txt
+  schedule: "0 8    *   *   Sat"
+- name: job-plot2
+  image: python3.7
+  mem: 2Gi
+  command: "venv/bin/python local/bin/plot_batch.py --start=-70days --sampling W --output $HOME/public_html/latest.svg --dump $HOME/public_html/latest.csv.gz"
+  filelog-stdout: public_html/logs/job-plot2.txt
+  filelog-stderr: public_html/logs/job-plot2.txt
+  schedule: "0 20   *   *   */2"
