@@ -1,0 +1,17 @@
+{
+	"name" : "commons-app-stats",
+	"title" : "Commons App Stats",
+	"description" : "Commons App Stats shows contribution statistics for the Wikimedia Commons Android app",
+	"url" : "https://citationhunt.toolforge.org/",
+	"keywords" : "mobile app, Wikimedia Commons, Android",
+	"author" : [
+		{
+			"name" : "Yusuke Matsubara",
+			"wiki_username" : "whym"
+		}
+	],
+	"tool_type" : "web app",
+	"license" : "Apache 2.0",
+	"repository" : "https://github.com/whym/commons-app-stats/",
+	"bugtracker_url" : "https://github.com/whym/commons-app-stats/issues"
+}
